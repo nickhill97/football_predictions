@@ -6,10 +6,8 @@ import os
 import pandas as pd
 import numpy as np
 
-# Local imports
-from definitions import PREMIER_LEAGUE_RESULTS, PROCESSED_DIR
 
-
+# Constant to determine stats to calculate
 STATISTICS = {
     'average_stats': {
         'win_ratio': 'W',
@@ -41,6 +39,10 @@ def get_relative_score(fixtures):
 
 
 class FootballLeagueTable:
+    """
+    Class for creating, updating and getting statistics from a league table for
+    a set of fixtures.
+    """
 
     def __init__(self, fixtures):
         """
@@ -48,10 +50,12 @@ class FootballLeagueTable:
         in the fixtures. The index is the team id and then the table records
         statistics for each team based on the games played.
         """
+        # Get list of all teams
         teams = pd.DataFrame(
             fixtures[['home_team_id', 'home_team']].drop_duplicates().values,
             columns=['team_id', 'team_name']
         )
+        # Statistics to record
         statistics = [
             'position', 'GP', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'points']
         league_stats = pd.DataFrame(
@@ -100,6 +104,7 @@ class FootballLeagueTable:
                 self.league_table.at[home_id, 'D'] += 1
                 self.league_table.at[away_id, 'D'] += 1
 
+        # Update table for all matches
         matches.apply(lambda x: _update_table_from_match(self, x), axis=1)
 
     def calculate_league_positions(self):
@@ -198,19 +203,18 @@ def get_calculated_stats(matches, league_table, statistic):
     return md_home_stats, md_away_stats
 
 
-def create_league_statistics(fixtures, stats_from_table, average_stats):
+def create_league_statistics(fixtures):
     """
     This function returns the fixtures dataframe and includes statistics for
     each fixture that were accurate at the date of the match. The statistics
-    returned for both home and away teams are:
-        * League Position
-        * Win Ratio
-        * Average Goals Per Game
-        * Average Goals Conceded Per Game
-        * Average Points Per Game
+    determined by the constant at the top of the file.
     """
     # Create league table
     league = FootballLeagueTable(fixtures)
+
+    # Statistics to be calculated from constants
+    stats_from_table = STATISTICS['stats_from_table']
+    average_stats = STATISTICS['average_stats']
 
     # Create stats information to be calculated
     statistics_kws = set(
@@ -263,14 +267,17 @@ def evaluate_result(fixture, home_team):
     False. The evaluation of the result is based on the league position of the
     opposition team and the points gained from the result.
     """
+    # Find the oppositions league position
     opp_league_position = (
         fixture['away_league_position'] if home_team
         else fixture['home_league_position'])
     opp_league_pos_group = np.ceil(opp_league_position/4)
 
+    # Calculate points gained from match
     points = 3*np.heaviside(
         np.heaviside(home_team, -1) * fixture['relative_score'], 1/3)
 
+    # Return evaluation of result
     return points/opp_league_pos_group
 
 
@@ -279,22 +286,30 @@ def evaluate_recent_form(fixture, fixtures, home_team):
     This function returns the sum of a teams result evaluations from the teams
     previous five league matches.
     """
+    # Get team id and fixture date
     team_id = fixture['home_team_id'] if home_team else fixture['away_team_id']
     match_date = fixture['date']
 
-    team_home_fixture = fixtures['home_team_id'] == team_id
-    team_away_fixture = fixtures['away_team_id'] == team_id
-    previous_fixture = fixtures['date'] < match_date
+    # Logic to return previous home and away matches of team
+    team_home_fixtures = fixtures['home_team_id'] == team_id
+    team_away_fixtures = fixtures['away_team_id'] == team_id
+    previous_fixtures = fixtures['date'] < match_date
 
-    home_fixtures = fixtures[team_home_fixture & previous_fixture]
-    away_fixtures = fixtures[team_away_fixture & previous_fixture]
+    # Get results of home and away games prior to fixture
+    previous_home_fixtures = fixtures[team_home_fixtures & previous_fixtures]
+    previous_away_fixtures = fixtures[team_away_fixtures & previous_fixtures]
 
-    home_form = home_fixtures[['date', 'home_evaluation']]
-    home_form = home_form.rename(columns={'home_evaluation': 'match_form'})
+    # Get home match evaluations
+    home_form = previous_home_fixtures[['date', 'home_evaluation']]
+    home_form = home_form.rename(
+        columns={'home_evaluation': 'match_evaluation'})
 
-    away_form = away_fixtures[['date', 'away_evaluation']]
-    away_form = away_form.rename(columns={'away_evaluation': 'match_form'})
+    # Get away match evaluations
+    away_form = previous_away_fixtures[['date', 'away_evaluation']]
+    away_form = away_form.rename(
+        columns={'away_evaluation': 'match_evaluation'})
 
+    # Concat home and away match evaluations and get most recent 5 results
     team_match_form = pd.concat([home_form, away_form]).sort_values('date')
     last_5_matches = team_match_form.tail(5)
 
@@ -306,6 +321,7 @@ def create_form_statistics(fixtures):
     This function returns the fixtures with information about the form of each
     team.
     """
+    # Evaluate results from perspective of home and away teams
     home_evaluation = fixtures.apply(
         lambda x: evaluate_result(x, True), axis=1).rename('home_evaluation')
     away_evaluation = fixtures.apply(
@@ -314,6 +330,7 @@ def create_form_statistics(fixtures):
     fixtures_w_eval = pd.concat(
         [fixtures, home_evaluation, away_evaluation], axis=1)
 
+    # Find form at time of match for home and away teams
     home_form = fixtures.apply(
         lambda x: evaluate_recent_form(x, fixtures_w_eval, True), axis=1)
     away_form = fixtures.apply(
@@ -339,6 +356,7 @@ def predict_score(fixtures):
         'away_average_conceded': fixtures['away_average_conceded'],
     }
 
+    # Predict home and away goals based on attacking and defensive records
     home_exp_goals = (
         goal_information['home_average_scored']
         * goal_information['away_average_conceded'])
@@ -346,6 +364,7 @@ def predict_score(fixtures):
         goal_information['away_average_scored']
         * goal_information['home_average_conceded'])
 
+    # Get relative expected score
     exp_score = home_exp_goals - away_exp_goals
     exp_score = exp_score.rename('exp_score')
 
@@ -356,15 +375,20 @@ def predict_score(fixtures):
     return new_fixtures
 
 
-def get_relative_statistics(fixtures, relative_statistics):
+def get_relative_statistics(fixtures):
     """
     Create relative statistics columns from statistics about each team in
     fixture.
     """
+    # Relative statistics to be calculated from constant
+    relative_statistics = STATISTICS['relative_statistics']
+
     home_away = ('home', 'away')
     relative_stats = {}
 
+    # Calculate relative stats
     for key, statistics in relative_statistics.items():
+        # For lower better stats calculate (-1)(home - away)
         sign = -1 if key == 'lower_better' else 1
         for statistic in statistics:
             stats = {
@@ -373,9 +397,10 @@ def get_relative_statistics(fixtures, relative_statistics):
                 fixtures[stats['home']] - fixtures[stats['away']])
             relative_stats.update(
                 {'_'.join(['relative', statistic]): relative_stat})
-
+    # Create dataframe of the relative statistics
     relative_stats = pd.DataFrame(relative_stats)
 
+    # Remove home and away statistics
     cols = [
         '_'.join([prefix, stat]) for stat in statistics for prefix in home_away
     ]
@@ -385,21 +410,40 @@ def get_relative_statistics(fixtures, relative_statistics):
 
 
 def main():
-    prem_seasons = os.scandir(PREMIER_LEAGUE_RESULTS)
+    """
+    Takes the premier league fixtures information and creates a set of data to
+    be used in modelling and saves as a csv file.
+    """
+    # Get project path from environment variable
+    project_path = os.environ.get('FOOTBALL_PREDICTIONS')
+
+    # If there are no results in the path return
+    prem_seasons_path = os.path.join(
+        project_path, 'data', 'premier_league_results')
+    if not os.path.exists(prem_seasons_path):
+        print("Premier League Results are not in path, run "
+              "'match_results_api.py' to get initial data.")
+        return
+
+    # For each season produce statistics for matches and concat
+    prem_seasons = os.scandir(prem_seasons_path)
     premier_league_matches = pd.DataFrame()
     for season in prem_seasons:
         fixtures = pd.read_csv(season.path)
         fixtures = get_relative_score(fixtures)
-        fixtures = create_league_statistics(
-            fixtures, STATISTICS['stats_from_table'],
-            STATISTICS['average_stats'])
+        fixtures = create_league_statistics(fixtures)
         fixtures = create_form_statistics(fixtures)
         fixtures = predict_score(fixtures)
-        fixtures = get_relative_statistics(
-            fixtures, STATISTICS['relative_stats'])
+        fixtures = get_relative_statistics(fixtures)
         premier_league_matches = pd.concat([premier_league_matches, fixtures])
+
+    # Save as a csv file in processed files
+    processed_data_path = os.path.join(project_path, 'data', 'processed')
+    if not os.path.exists(processed_data_path):
+        os.makedirs(processed_data_path)
+
     premier_league_matches.to_csv(os.path.join(
-        PROCESSED_DIR, 'processed_prem_fixtures.csv'), index=False)
+        processed_data_path, 'processed_prem_fixtures.csv'), index=False)
 
 
 if __name__ == '__main__':

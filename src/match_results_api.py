@@ -10,11 +10,10 @@ import pandas as pd
 
 # Local imports
 from private import FOOTBALL_API_KEY
-from definitions import DATA_DIR
 
 
 def get_football_data(endpoint_extension):
-    """Returns the response from the api call with the endpoint extension"""
+    """Returns the response from the api call with the endpoint extension."""
     api_endpoint = "https://api-football-v1.p.rapidapi.com/v2/"
     headers = {
         'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
@@ -61,10 +60,13 @@ def get_league_ids(league_type=None, country=None):
 
 
 def get_league_results(league_id):
-    """Returns results for fixtures from given league id"""
+    """Returns results for fixtures from given league id."""
+    # Get fixtures information from api endpoint
     endpoint_extension = 'fixtures/league/' + str(league_id)
     fixtures_response = get_football_data(endpoint_extension)
     fixtures = json.loads(fixtures_response.text)['api']['fixtures']
+
+    # Get results to save from information returned
     results = []
     for fixture in fixtures:
         fixture_datetime = datetime.fromtimestamp(fixture['event_timestamp'])
@@ -94,16 +96,26 @@ def league_fixtures_to_csv(league_type=None, country=None, name=None):
     if name is None:
         return
 
+    # Data path
+    project_path = os.environ.get('FOOTBALL_PREDICTIONS')
+    data_path = os.path.join(project_path, 'data')
+
+    # Name and country in correct format
     country = country.lower()
-    league_ids = get_league_ids(league_type=league_type, country=country)
     league_name = name.replace(' ', '_').lower()
+
+    # Get the league ids of wanted seasons
+    league_ids = get_league_ids(league_type=league_type, country=country)
+
+    # Create directory for results
     league_path = Path(os.path.join(
-        DATA_DIR,
+        data_path,
         ''.join([league_name, '_results']),
     ))
     if not os.path.exists(league_path):
         os.makedirs(league_path)
 
+    # Get results for all seasons and save as csv file
     for league_id, season in league_ids.get(name):
         results = get_league_results(league_id)
         season_path = Path(os.path.join(
@@ -111,3 +123,7 @@ def league_fixtures_to_csv(league_type=None, country=None, name=None):
             ''.join([str(season), '.csv'])
         ))
         results.to_csv(season_path, index=False)
+
+
+if __name__ == '__main__':
+    league_fixtures_to_csv(country='England', name='Premier League')
