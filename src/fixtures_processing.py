@@ -313,7 +313,7 @@ def evaluate_recent_form(fixture, fixtures, home_team):
     team_match_form = pd.concat([home_form, away_form]).sort_values('date')
     last_5_matches = team_match_form.tail(5)
 
-    return last_5_matches['match_form'].sum()
+    return last_5_matches['match_evaluation'].sum()
 
 
 def create_form_statistics(fixtures):
@@ -381,7 +381,7 @@ def get_relative_statistics(fixtures):
     fixture.
     """
     # Relative statistics to be calculated from constant
-    relative_statistics = STATISTICS['relative_statistics']
+    relative_statistics = STATISTICS['relative_stats']
 
     home_away = ('home', 'away')
     relative_stats = {}
@@ -402,7 +402,9 @@ def get_relative_statistics(fixtures):
 
     # Remove home and away statistics
     cols = [
-        '_'.join([prefix, stat]) for stat in statistics for prefix in home_away
+        '_'.join([prefix, stat])
+        for stat in sum(relative_statistics.values(), [])
+        for prefix in home_away
     ]
     new_fixtures = fixtures.drop(cols, axis=1)
 
