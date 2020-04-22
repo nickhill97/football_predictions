@@ -1,5 +1,4 @@
 # Standard library imports
-from operator import add
 import os
 
 # Third party imports
@@ -30,12 +29,28 @@ STATISTICS = {
 }
 
 
+def drop_future_fixtures(fixtures):
+    """Drops fixtures that haven't happened yet."""
+    return fixtures.dropna(subset=['home_goals', 'away_goals'])
+
+
 def get_relative_score(fixtures):
     """Returns a dataframe with a relative score for the fixtures."""
     relative_score = fixtures['home_goals'] - fixtures['away_goals']
     relative_score = relative_score.rename('relative_score')
 
     return pd.concat([fixtures, relative_score], axis=1)
+
+
+def get_winner(fixtures):
+    """
+    Returns H, D or A to encode which team won the game or if it was a draw.
+    """
+    map_key = {-1: 'A', 0: 'D', 1: 'H'}
+    winner = np.sign(fixtures['relative_score']).rename('winner')
+    winner = winner.map(map_key)
+
+    return pd.concat([fixtures, winner], axis=1)
 
 
 class FootballLeagueTable:
@@ -220,7 +235,7 @@ def create_league_statistics(fixtures):
     statistics_kws = set(
         stats_from_table.keys()).union(set(average_stats.keys()))
     home_away = ['home', 'away']
-    statistics = {stat: ([], []) for stat in statistics_kws}
+    statistics = {stat: [[], []] for stat in statistics_kws}
 
     # Loop through the different match days
     for match_day in sorted(fixtures['date'].unique()):
@@ -234,18 +249,14 @@ def create_league_statistics(fixtures):
         matches = fixtures[fixtures['date'] == match_day]
 
         for stat, param in stats_from_table.items():
-            statistics[stat] = tuple(map(
-                add,
-                statistics[stat],
-                get_stats_from_table(matches, league, param)
-            ))
+            new_stats_list = get_stats_from_table(matches, league, param)
+            for old_stats, new_stats in zip(statistics[stat], new_stats_list):
+                old_stats.extend(new_stats)
 
         for stat, param in average_stats.items():
-            statistics[stat] = tuple(map(
-                add,
-                statistics[stat],
-                get_calculated_stats(matches, league, param)
-            ))
+            new_stats_list = get_calculated_stats(matches, league, param)
+            for old_stats, new_stats in zip(statistics[stat], new_stats_list):
+                old_stats.extend(new_stats)
 
         # Update the standings from the games from the match day
         league.update_table_from_matches(matches)
@@ -257,7 +268,8 @@ def create_league_statistics(fixtures):
         for stat, values in statistics.items()
         for prefix, value in zip(home_away, values)
     }
-    return pd.concat([fixtures, pd.DataFrame(statistics)], axis=1)
+    return pd.concat(
+        [fixtures.reset_index(drop=True), pd.DataFrame(statistics)], axis=1)
 
 
 def evaluate_result(fixture, home_team):
@@ -406,7 +418,7 @@ def get_relative_statistics(fixtures):
         for stat in sum(relative_statistics.values(), [])
         for prefix in home_away
     ]
-    new_fixtures = fixtures.drop(cols, axis=1)
+    new_fixtures = fixtures.drop(cols, axis=1).reset_index(drop=True)
 
     return pd.concat([new_fixtures, relative_stats], axis=1)
 
@@ -432,7 +444,9 @@ def main():
     premier_league_matches = pd.DataFrame()
     for season in prem_seasons:
         fixtures = pd.read_csv(season.path)
+        fixtures = drop_future_fixtures(fixtures)
         fixtures = get_relative_score(fixtures)
+        fixtures = get_winner(fixtures)
         fixtures = create_league_statistics(fixtures)
         fixtures = create_form_statistics(fixtures)
         fixtures = predict_score(fixtures)
