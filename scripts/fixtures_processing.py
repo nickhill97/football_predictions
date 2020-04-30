@@ -9,23 +9,17 @@ import numpy as np
 # Constant to determine stats to calculate
 STATISTICS = {
     'average_stats': {
-        'win_ratio': 'W',
         'average_scored': 'GF',
+        'overall_average_scored': 'GF',
         'average_conceded': 'GA',
+        'overall_average_conceded': 'GA',
         'average_points': 'points',
+        'overall_average_points': 'points',
     },
     'stats_from_table': {
         'league_position': 'position',
         'games_played': 'GP'
     },
-    'relative_stats': {
-        'lower_better': ['league_position'],
-        'higher_better': [
-            'win_ratio',
-            'average_points',
-            'league_form',
-        ]
-    }
 }
 
 
@@ -53,11 +47,12 @@ def get_winner(fixtures):
     return pd.concat([fixtures, winner], axis=1)
 
 
-class FootballLeagueTable:
+class FootballLeagueTable(object):
     """
     Class for creating, updating and getting statistics from a league table for
     a set of fixtures.
     """
+    statistics = ['GP', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'points']
 
     def __init__(self, fixtures):
         """
@@ -71,8 +66,12 @@ class FootballLeagueTable:
             columns=['team_id', 'team_name']
         )
         # Statistics to record
-        statistics = [
-            'position', 'GP', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'points']
+        statistics = ['position']
+        statistics += [
+            '_'.join([prefix, stat])
+            for prefix in ('home', 'away') for stat in self.statistics]
+        statistics += self.statistics
+
         league_stats = pd.DataFrame(
             np.zeros((len(teams), len(statistics))),
             columns=statistics
@@ -95,29 +94,29 @@ class FootballLeagueTable:
             away_id = match['away_team_id']
 
             # Add 1 to games played (GP)
-            self.league_table.at[home_id, 'GP'] += 1
-            self.league_table.at[away_id, 'GP'] += 1
+            self.league_table.at[home_id, 'home_GP'] += 1
+            self.league_table.at[away_id, 'away_GP'] += 1
 
             # Update goals scored (GF) during season
-            self.league_table.at[home_id, 'GF'] += match['home_goals']
-            self.league_table.at[away_id, 'GF'] += match['away_goals']
+            self.league_table.at[home_id, 'home_GF'] += match['home_goals']
+            self.league_table.at[away_id, 'away_GF'] += match['away_goals']
 
             # Update goals conceded (GA) during season
-            self.league_table.at[home_id, 'GA'] += match['away_goals']
-            self.league_table.at[away_id, 'GA'] += match['home_goals']
+            self.league_table.at[home_id, 'home_GA'] += match['away_goals']
+            self.league_table.at[away_id, 'away_GA'] += match['home_goals']
 
             # Update wins, losses, draws
             if match['home_goals'] > match['away_goals']:
-                self.league_table.at[home_id, 'W'] += 1
-                self.league_table.at[away_id, 'L'] += 1
+                self.league_table.at[home_id, 'home_W'] += 1
+                self.league_table.at[away_id, 'away_L'] += 1
 
             elif match['away_goals'] > match['home_goals']:
-                self.league_table.at[away_id, 'W'] += 1
-                self.league_table.at[home_id, 'L'] += 1
+                self.league_table.at[away_id, 'away_W'] += 1
+                self.league_table.at[home_id, 'home_L'] += 1
 
             else:
-                self.league_table.at[home_id, 'D'] += 1
-                self.league_table.at[away_id, 'D'] += 1
+                self.league_table.at[home_id, 'home_D'] += 1
+                self.league_table.at[away_id, 'away_D'] += 1
 
         # Update table for all matches
         matches.apply(lambda x: _update_table_from_match(self, x), axis=1)
@@ -142,74 +141,113 @@ class FootballLeagueTable:
     def update_table(self):
         """Updates the points and goal difference for each team"""
 
-        def _update_points(team):
-            return 3 * team['W'] + team['D']
+        def _update_points():
+            """Updates points for home and away stats."""
+            for prefix in ('home', 'away'):
+                columns = {
+                    'W': '_'.join([prefix, 'W']), 'D': '_'.join([prefix, 'D'])}
+                self.league_table['_'.join([prefix, 'points'])] = (
+                    3 * self.league_table[columns['W']]
+                    + self.league_table[columns['D']]
+                )
 
-        def _update_gd(team):
-            return team['GF'] - team['GA']
+        def _update_gd():
+            """Updates goal difference for home and away stats."""
+            for prefix in ('home', 'away'):
+                columns = {
+                    'GF': '_'.join([prefix, 'GF']),
+                    'GA': '_'.join([prefix, 'GA'])
+                    }
+                self.league_table['_'.join([prefix, 'GD'])] = (
+                    self.league_table[columns['GF']]
+                    - self.league_table[columns['GA']]
+                )
 
-        self.league_table.points = (
-            self.league_table.apply(_update_points, axis=1))
-        self.league_table.GD = self.league_table.apply(_update_gd, axis=1)
+        def _update_overall_stats():
+            """Adds home and away stats to get overall stats."""
+            for stat in self.statistics:
+                columns = [
+                    '_'.join([prefix, stat]) for prefix in ('home', 'away')]
+                self.league_table[stat] = (
+                    self.league_table[columns].sum(axis=1))
+
+        _update_points()
+        _update_gd()
+        _update_overall_stats()
 
     def get_team_info(self, team_id):
         """Gets season information of team."""
         return self.league_table.loc[team_id]
 
-    def get_team_stats_per_game(self, team_id, statistic):
+    def get_team_stats_per_game(self, team_id, statistic, home_or_away=None):
         """
         Finds the average per game for a statistic for the season before the
         date of the match for both teams.
         """
+        games_played = 'GP'
+        if home_or_away is not None:
+            games_played = '_'.join([home_or_away, games_played])
+            statistic = '_'.join([home_or_away, statistic])
+
         team = self.get_team_info(team_id)
         stat = np.nan
-        if team['GP'] > 0:
-            stat = team[statistic] / team['GP']
+        if team[games_played] > 0:
+            stat = team[statistic] / team[games_played]
 
         return stat
 
 
-def get_teams_stat(match, league_table, statistic):
+def get_teams_stat(match, league_table, statistic, home_and_away=None):
     """Returns statistic from league table for home and away teams."""
     home_team = league_table.get_team_info(match['home_team_id'])
     away_team = league_table.get_team_info(match['away_team_id'])
+    statistic = {k: statistic for k in ('home', 'away')}
 
-    return home_team[statistic], away_team[statistic]
+    if home_and_away:
+        statistic = {k: '_'.join([k, v]) for k, v in statistic.items()}
+
+    return home_team[statistic['home']], away_team[statistic['away']]
 
 
-def get_stats_from_table(matches, league_table, statistic):
+def get_stats_from_table(matches, league_table, statistic, home_and_away=None):
     """
     For a set of matches, the function returns the home and away teams
     statistics from the current table as two lists contained in tuple.
     """
     md_stats = list(zip(*matches.apply(
-        lambda x: get_teams_stat(x, league_table, statistic), axis=1)))
+        lambda x: get_teams_stat(
+            x, league_table, statistic, home_and_away), axis=1)))
     md_home_stats = list(md_stats[0])
     md_away_stats = list(md_stats[1])
 
     return md_home_stats, md_away_stats
 
 
-def get_calculated_stat(match, league_table, statistic):
+def get_calculated_stat(match, league_table, statistic, home_and_away=None):
     """
     Finds the average per game for a statistic for the season before the date
     of the match for both teams.
     """
+    home = 'home' if home_and_away else None
+    away = 'away' if home_and_away else None
     home_team_id = match['home_team_id']
     away_team_id = match['away_team_id']
-    home_stat = league_table.get_team_stats_per_game(home_team_id, statistic)
-    away_stat = league_table.get_team_stats_per_game(away_team_id, statistic)
+    home_stat = league_table.get_team_stats_per_game(
+        home_team_id, statistic, home)
+    away_stat = league_table.get_team_stats_per_game(
+        away_team_id, statistic, away)
 
     return home_stat, away_stat
 
 
-def get_calculated_stats(matches, league_table, statistic):
+def get_calculated_stats(matches, league_table, statistic, home_and_away=None):
     """
     For a set of matches, the function returns the teams averages per game for
     a given statistic from the current table.
     """
     md_stats = list(zip(*matches.apply(
-        lambda x: get_calculated_stat(x, league_table, statistic),
+        lambda x: get_calculated_stat(
+            x, league_table, statistic, home_and_away),
         axis=1
     )))
     md_home_stats = list(md_stats[0])
@@ -234,7 +272,6 @@ def create_league_statistics(fixtures):
     # Create stats information to be calculated
     statistics_kws = set(
         stats_from_table.keys()).union(set(average_stats.keys()))
-    home_away = ['home', 'away']
     statistics = {stat: [[], []] for stat in statistics_kws}
 
     # Loop through the different match days
@@ -249,12 +286,20 @@ def create_league_statistics(fixtures):
         matches = fixtures[fixtures['date'] == match_day]
 
         for stat, param in stats_from_table.items():
+            # Calculate statistics
             new_stats_list = get_stats_from_table(matches, league, param)
+
+            # Extend lists in statistics dictionary
             for old_stats, new_stats in zip(statistics[stat], new_stats_list):
                 old_stats.extend(new_stats)
 
         for stat, param in average_stats.items():
-            new_stats_list = get_calculated_stats(matches, league, param)
+            # Calculate statistics
+            home_and_away = 'overall' not in stat
+            new_stats_list = get_calculated_stats(
+                matches, league, param, home_and_away)
+
+            # Extend lists in statistics dictionary
             for old_stats, new_stats in zip(statistics[stat], new_stats_list):
                 old_stats.extend(new_stats)
 
@@ -279,21 +324,41 @@ def evaluate_result(fixture, home_team):
     False. The evaluation of the result is based on the league position of the
     opposition team and the points gained from the result.
     """
+    # Split league into groups by legaue position
+    split = 4
+    splits = 20/split
+
     # Find the oppositions league position
     opp_league_position = (
         fixture['away_league_position'] if home_team
         else fixture['home_league_position'])
-    opp_league_pos_group = np.ceil(opp_league_position/4)
+    opp_league_pos_group = np.ceil(opp_league_position/split)
 
-    # Calculate points gained from match
-    points = 3*np.heaviside(
-        np.heaviside(home_team, -1) * fixture['relative_score'], 1/3)
+    # Bonus for winning away
+    away_bonus = 1 if home_team else 2
+    # Penalty for drawing/losing at home
+    home_penalty = 2 if home_team else 1
+    relative_score = np.heaviside(home_team, -1) * fixture['relative_score']
 
-    # Return evaluation of result
-    return points/opp_league_pos_group
+    # Evaluation for winning
+    if relative_score > 0:
+        evaluation = (
+            1 + away_bonus * relative_score *
+            (1 - ((opp_league_pos_group - 1) / splits))
+        )
+    # Evaluation for losing
+    elif relative_score < 0:
+        evaluation = (
+            -1 + home_penalty * relative_score * opp_league_pos_group / splits
+        )
+    # Evaluation for draw
+    else:
+        evaluation = 1 - (home_penalty * (opp_league_pos_group - 1) / splits)
+
+    return evaluation
 
 
-def evaluate_recent_form(fixture, fixtures, home_team):
+def evaluate_recent_form(fixture, fixtures, home_team, overall_form):
     """
     This function returns the sum of a teams result evaluations from the teams
     previous five league matches.
@@ -312,20 +377,28 @@ def evaluate_recent_form(fixture, fixtures, home_team):
     previous_away_fixtures = fixtures[team_away_fixtures & previous_fixtures]
 
     # Get home match evaluations
-    home_form = previous_home_fixtures[['date', 'home_evaluation']]
-    home_form = home_form.rename(
-        columns={'home_evaluation': 'match_evaluation'})
+    if overall_form or home_team:
+        home_form = previous_home_fixtures[['date', 'home_evaluation']]
+        home_form = home_form.rename(
+            columns={'home_evaluation': 'match_evaluation'})
 
     # Get away match evaluations
-    away_form = previous_away_fixtures[['date', 'away_evaluation']]
-    away_form = away_form.rename(
-        columns={'away_evaluation': 'match_evaluation'})
+    if overall_form or not home_team:
+        away_form = previous_away_fixtures[['date', 'away_evaluation']]
+        away_form = away_form.rename(
+            columns={'away_evaluation': 'match_evaluation'})
 
-    # Concat home and away match evaluations and get most recent 5 results
-    team_match_form = pd.concat([home_form, away_form]).sort_values('date')
-    last_5_matches = team_match_form.tail(5)
+    # Concat home and away match evaluations if calculating overall form
+    # and get most recent 5 results
+    if overall_form:
+        team_match_form = pd.concat([home_form, away_form])
+    else:
+        team_match_form = home_form if home_team else away_form
 
-    return last_5_matches['match_evaluation'].sum()
+    team_match_form = team_match_form.sort_values('date')
+    last_3_matches = team_match_form.tail(3)
+
+    return last_3_matches['match_evaluation'].mean()
 
 
 def create_form_statistics(fixtures):
@@ -343,84 +416,27 @@ def create_form_statistics(fixtures):
         [fixtures, home_evaluation, away_evaluation], axis=1)
 
     # Find form at time of match for home and away teams
+    home_overall_form = fixtures.apply(
+        lambda x: evaluate_recent_form(x, fixtures_w_eval, True, True),
+        axis=1)
+    away_overall_form = fixtures.apply(
+        lambda x: evaluate_recent_form(x, fixtures_w_eval, False, True),
+        axis=1)
     home_form = fixtures.apply(
-        lambda x: evaluate_recent_form(x, fixtures_w_eval, True), axis=1)
+        lambda x: evaluate_recent_form(x, fixtures_w_eval, True, False),
+        axis=1)
     away_form = fixtures.apply(
-        lambda x: evaluate_recent_form(x, fixtures_w_eval, False), axis=1)
-
-    home_form = home_form.rename('home_league_form')
-    away_form = away_form.rename('away_league_form')
-
-    return pd.concat([fixtures, home_form, away_form], axis=1)
-
-
-def predict_score(fixtures):
-    """
-    Calculate a prediction of how many goals each team scores and then return
-    the dataframe with the difference of the goals. The goal predictions will
-    be made by multiplying the average goals scored by one team by the average
-    goals conceded by the other team.
-    """
-    goal_information = {
-        'home_average_scored': fixtures['home_average_scored'],
-        'home_average_conceded': fixtures['home_average_conceded'],
-        'away_average_scored': fixtures['away_average_scored'],
-        'away_average_conceded': fixtures['away_average_conceded'],
-    }
-
-    # Predict home and away goals based on attacking and defensive records
-    home_exp_goals = (
-        goal_information['home_average_scored']
-        * goal_information['away_average_conceded'])
-    away_exp_goals = (
-        goal_information['away_average_scored']
-        * goal_information['home_average_conceded'])
-
-    # Get relative expected score
-    exp_score = home_exp_goals - away_exp_goals
-    exp_score = exp_score.rename('exp_score')
-
-    new_fixtures = pd.concat(
-        [fixtures.drop(list(goal_information.keys()), axis=1), exp_score],
+        lambda x: evaluate_recent_form(x, fixtures_w_eval, False, False),
         axis=1)
 
-    return new_fixtures
+    home_overall_form = home_overall_form.rename('home_overall_form')
+    away_overall_form = away_overall_form.rename('away_overall_form')
+    home_form = home_form.rename('home_form')
+    away_form = away_form.rename('away_form')
 
-
-def get_relative_statistics(fixtures):
-    """
-    Create relative statistics columns from statistics about each team in
-    fixture.
-    """
-    # Relative statistics to be calculated from constant
-    relative_statistics = STATISTICS['relative_stats']
-
-    home_away = ('home', 'away')
-    relative_stats = {}
-
-    # Calculate relative stats
-    for key, statistics in relative_statistics.items():
-        # For lower better stats calculate (-1)(home - away)
-        sign = -1 if key == 'lower_better' else 1
-        for statistic in statistics:
-            stats = {
-                prefix: '_'.join([prefix, statistic]) for prefix in home_away}
-            relative_stat = sign * (
-                fixtures[stats['home']] - fixtures[stats['away']])
-            relative_stats.update(
-                {'_'.join(['relative', statistic]): relative_stat})
-    # Create dataframe of the relative statistics
-    relative_stats = pd.DataFrame(relative_stats)
-
-    # Remove home and away statistics
-    cols = [
-        '_'.join([prefix, stat])
-        for stat in sum(relative_statistics.values(), [])
-        for prefix in home_away
-    ]
-    new_fixtures = fixtures.drop(cols, axis=1).reset_index(drop=True)
-
-    return pd.concat([new_fixtures, relative_stats], axis=1)
+    return pd.concat(
+        [fixtures, home_form, home_overall_form, away_form, away_overall_form],
+        axis=1)
 
 
 def main():
@@ -449,8 +465,8 @@ def main():
         fixtures = get_winner(fixtures)
         fixtures = create_league_statistics(fixtures)
         fixtures = create_form_statistics(fixtures)
-        fixtures = predict_score(fixtures)
-        fixtures = get_relative_statistics(fixtures)
+        # fixtures = predict_score(fixtures)
+        # fixtures = get_relative_statistics(fixtures)
         premier_league_matches = pd.concat([premier_league_matches, fixtures])
 
     # Save as a csv file in processed files
