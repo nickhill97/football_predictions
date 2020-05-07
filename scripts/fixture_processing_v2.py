@@ -53,6 +53,8 @@ def get_home_away_perspective(fixtures):
             'away_overall_form': "opposition_season_form"
         }
         home_games = fixtures[rename_map.keys()].rename(columns=rename_map)
+        home_games['games_played'] = fixtures[
+            ['home_games_played', 'away_games_played']].min(axis=1)
         home_games['home'] = 1
         return home_games
 
@@ -87,6 +89,8 @@ def get_home_away_perspective(fixtures):
         }
         away_games = fixtures[rename_map.keys()].rename(columns=rename_map)
         away_games['relative_score'] = -away_games['relative_score']
+        away_games['games_played'] = fixtures[
+            ['home_games_played', 'away_games_played']].min(axis=1)
         away_games['home'] = 0
         return away_games
 
