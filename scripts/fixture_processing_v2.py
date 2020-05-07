@@ -122,25 +122,37 @@ def get_previous_hth_matches(fixtures, team_id, opposition_id, date):
     return hth_matches
 
 
+def bayesian_average(results, C, m):
+    """Returns Bayesian average."""
+    no_results = len(results)
+    if no_results == 0:
+        return np.nan
+    return ((C*m) + results.sum()) / (C + no_results)
+
+
 def get_hth_average_points(fixtures, team_id, opposition_id, date):
     """
-    Returns the mean points gained from previous head to head fixtures between
-    teams.
+    Returns the Bayesian average points gained from previous head to head
+    fixtures between teams. We assume there is no difference between the teams
+    (m=1) and it takes three matches to form a conclusion on difference (C=3).
     """
     hth_matches = get_previous_hth_matches(
         fixtures, team_id, opposition_id, date)
     points = 3 * np.heaviside(hth_matches['relative_score'], 1/3)
 
-    return points.mean()
+    return bayesian_average(points, 3, 1)
 
 
 def get_hth_relative_score(fixtures, team_id, opposition_id, date):
     """
-    Returns mean relative score of head to head fixtures between two teams.
+    Returns Bayesian average of relative score of head to head fixtures between
+    two teams, where there is assumed to be no difference (m=0) and it
+    takes three matches to have confidence in a difference (C=3).
     """
     hth_matches = get_previous_hth_matches(
         fixtures, team_id, opposition_id, date)
-    return hth_matches['relative_score'].mean()
+
+    return bayesian_average(hth_matches['relative_score'], 3, 0)
 
 
 def get_head_to_head_stats(fixtures):
