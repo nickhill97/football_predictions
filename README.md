@@ -55,7 +55,9 @@ For these statistics I calculated the season average and also the average for ho
 
 ### Data Analysis
 
-I briefly performed an analysis of the data I had created. Here I wanted to see the proportions of each result and how the features effected the result. Here we have the count of results:
+I performed a brief analysis of the data I had created, these are a couple of the interesting graphs I produced:
+
+Here I wanted to see the proportions of each result and how the features effected the result. Firstly, we have the count of results.
 
 <img src='images/result_count.png'/>
 
@@ -63,4 +65,4 @@ I briefly performed an analysis of the data I had created. Here I wanted to see 
 
 None of the features provided a large amount of prediction power, here we have a diagram showing the distributions of relative league position between the two teams for home wins, draws and away wins.
 
-<img src='images/results_league_position_dist.png'/>
+<img src='images/results_league_position_dist.png' width=600/>
