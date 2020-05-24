@@ -19,10 +19,10 @@ The purpose of this project was to use machine learning to predict premier leagu
 
 The data was collected from two sources, I used an API endpoint to find the premier league fixtures for the last 10 years and I found betting data for the 2019 season as a CSV file from a website. The sources of this data can be found here:
 
-- [https://www.api-football.com/](API Endpoint)
-- [https://www.football-data.co.uk/englandm.php](Betting Data Website)
+- [API Endpoint](https://www.api-football.com/)
+- [Betting Data Website](https://www.football-data.co.uk/englandm.php)
 
-For the fixtures data, I used a [\scripts\match_results_api.py](Python script) to make a get request to the API endpoint and filter the data that I wanted for my analysis and then saved the raw data in CSV files for each season. The data I collected here was:
+For the fixtures data, I used a [Python script](\scripts\match_results_api.py) to make a get request to the API endpoint and filter the data that I wanted for my analysis and then saved the raw data in CSV files for each season. The data I collected here was:
 
 - Date
 - Time
