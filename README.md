@@ -51,4 +51,16 @@ After collecting the fixtures information I engineered features for the machine 
 - Average head to head points
 - Average head to head relative score
 
-For these statistics I calculated the season average and also the average for home/away for each team. I calculated a teams form by evaluating team's previous results and taking an average of this evaluation from the teams previous 3 matches. The evaluation of each match was formed as a combination of the oppositions league position, the result, the relative score and if the match was home or away.  
+For these statistics I calculated the season average and also the average for home/away for each team. I calculated a teams form by evaluating team's previous results and taking an average of this evaluation from the teams previous 3 matches. The evaluation of each match was formed as a combination of the oppositions league position, the result, the relative score and if the match was home or away.
+
+### Data Analysis
+
+I briefly performed an analysis of the data I had created. Here I wanted to see the proportions of each result and how the features effected the result. Here we have the count of results:
+
+<img src='images/result_count.png'/>
+
+(H = Home Win, D = Draw, A = Away Win)
+
+None of the features provided a large amount of prediction power, here we have a diagram showing the distributions of relative league position between the two teams for home wins, draws and away wins.
+
+<img src='images/results_league_position_dist.png'/>
