@@ -22,7 +22,7 @@ The data was collected from two sources, I used an API endpoint to find the prem
 - [API Endpoint](https://www.api-football.com/)
 - [Betting Data Website](https://www.football-data.co.uk/englandm.php)
 
-For the fixtures data, I used a [Python script](\scripts\match_results_api.py) to make a get request to the API endpoint and filter the data that I wanted for my analysis and then saved the raw data in CSV files for each season. The data I collected here was:
+For the fixtures data, I used a [Python script](scripts\match_results_api.py) to make a get request to the API endpoint and filter the data that I wanted for my analysis and then saved the raw data in CSV files for each season. The data I collected here was:
 
 - Date
 - Time
