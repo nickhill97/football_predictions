@@ -61,8 +61,30 @@ Here I wanted to see the proportions of each result and how the features effecte
 
 <img src='images/result_count.png'/>
 
-(H = Home Win, D = Draw, A = Away Win)
+(H = Home Win, D = Draw, A = Away Win). We see that is it more common for the home team to win than any other result.
 
 None of the features provided a large amount of prediction power, here we have a diagram showing the distributions of relative league position between the two teams for home wins, draws and away wins.
 
 <img src='images/results_league_position_dist.png' width=600/>
+
+This graph shows that having a higher league position does make a team more likley to win but this is often not the case.
+
+### Modelling
+
+The modelling I performed can be found [here](notebooks). I created two versions of mhy modelling, where I used a slightly different approach in each version.
+
+#### Version 1
+
+Firstly, I dropped results where there was missing information and also games early in the season where some of the statistics could be unreliable. Then I found the interaction between the teams average scored and average conceded. After that I calculated relative statistics between the two teams, for example, if a team was 1st in the league and the opposition was 8th then the relative league position was 7.
+
+In the next step, I trained machine learning models to predict the relative score. I did this to be able to include the degree of a result (i.e. a 6-0 win is more convincing than a 1-0 win). Here the best model was ridge regression model with a root mean squared error of 1.66 and a mean absolute error of 1.28.
+
+Lastly, I trained models to predict the result of the match. I used a ordinal classifier class for machine learning, this was written by Muhammad Assagaf and can be found [here](https://towardsdatascience.com/simple-trick-to-train-an-ordinal-regression-with-any-classifier-6911183d2a3c). The reason I used this class was because my results are ordinal, i.e. a loss is worse than a draw, which is worse than a win. This was used as an extension to the machine learning models, such that the multiple classification problem was transformed to two binary classification problems: 
+
+- Binary target was 1 if result a loss and the classifier predicts V1 = 1 - Pr(Result better than loss).
+- Binary target was 1 if result was a draw and the classifier predicts V2 = Pr(Result better than loss) - Pr(Result better than a draw).
+- Binary target was 1 if result was a win and the classifier predicts V3 = Pr(Result was better than a draw) = 1 - V1 - V2.
+
+The best classifier was a logistic regression model with an accuracy of 0.54.
+
+#### Version 2
