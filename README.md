@@ -40,7 +40,7 @@ For the fixtures data, I used a [Python script](scripts/match_results_api.py) to
 
 ### Feature Engineering
 
-After collecting the fixtures information I engineered features for the machine learing algorithms to use. For this I have two versions of 'fixture_processing.py', that can be found [here](scripts). The features I created (that were correct at the date the matches were played) were:
+After collecting the fixtures information I engineered features for the machine learing algorithms to use. For this I have two versions of 'fixture_processing.py', that can be found [here](scripts). Version one was the script used to create the data for my first modelling and version two was for the second modelling notebook. The features I created (that were correct at the date the matches were played) were:
 
 - Relative score
 - League position
@@ -79,7 +79,7 @@ Firstly, I dropped results where there was missing information and also games ea
 
 In the next step, I trained machine learning models to predict the relative score. I did this to be able to include the degree of a result (i.e. a 6-0 win is more convincing than a 1-0 win). Here the best model was ridge regression model with a root mean squared error of 1.66 and a mean absolute error of 1.28.
 
-Lastly, I trained models to predict the result of the match. I used a ordinal classifier class for machine learning, this was written by Muhammad Assagaf and can be found [here](https://towardsdatascience.com/simple-trick-to-train-an-ordinal-regression-with-any-classifier-6911183d2a3c). The reason I used this class was because my results are ordinal, i.e. a loss is worse than a draw, which is worse than a win. This was used as an extension to the machine learning models, such that the multiple classification problem was transformed to two binary classification problems: 
+Lastly, I trained models to predict the result of the match. Prior to training classifiers I scaled my data using a standard scaler. I used a ordinal classifier class for machine learning, this was written by Muhammad Assagaf and can be found [here](https://towardsdatascience.com/simple-trick-to-train-an-ordinal-regression-with-any-classifier-6911183d2a3c). The reason I used this class was because my results are ordinal, i.e. a loss is worse than a draw, which is worse than a win. This was used as an extension to the machine learning models, such that the multiple classification problem was transformed to two binary classification problems: 
 
 - Binary target was 1 if result a loss and the classifier predicts V1 = 1 - Pr(Result better than loss).
 - Binary target was 1 if result was a draw and the classifier predicts V2 = Pr(Result better than loss) - Pr(Result better than a draw).
@@ -88,3 +88,20 @@ Lastly, I trained models to predict the result of the match. I used a ordinal cl
 The best classifier was a logistic regression model with an accuracy of 0.54.
 
 #### Version 2
+
+In this version I changed the format of the data to include the match from both perspectives and include a binary home feature to indicate if the match was home or away. I also changed the target of my models to be whether the team won or not instead of the result. Then I created interaction terms between all of the two teams statistics and calculated the relative of all the statistics. 
+
+Next, I created machine learning models to predict the relative score again. Before doing so I removed features with low correlation with the target and removed sources of multicollinearity. Again, I used a ridge regression model to predict relative score. The model had a root mean squared error of 1.62 and a mean absolute error of 1.26.
+
+The purpose of this model was to try find an effective betting strategy and therefore the evaluation metric I used was a F-beta score, with a beta of 0.5. The reason I did this was because I wanted the model to focus importance of both precision and recall but with more weight placed on precision. The best model was again a logistic regression model, with a weighted F1 score of 0.58 and an accuracy of 0.69.
+
+I then used this model to simulate a betting strategy for the fixtures in 2019, that my model had not been trained or tested on previously. I used the model to predict the matches and used the betting data to find the best odds. My model would have made bets on 167 out of 288 games, unfortunately losing 4%. This is not hugely surprising as the betting companies are very good at predicting the probability of teams winning games and setting the odds to reflect the probability.
+
+#### Improvements
+
+To improve the model it would be good to include more detailed information about the teams. For example: 
+
+- Player injuries/suspensions/transfers
+- Teams having midweek games (less recovery)
+- New manager information
+- Detailed statistics about each match (average possession/shots/saves etc.)
