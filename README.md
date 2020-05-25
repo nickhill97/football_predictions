@@ -34,7 +34,7 @@ For the fixtures data, I used a [Python script](scripts/match_results_api.py) to
 - Home Goals
 - Away Goals
 
-[//]: # (Betting data info)
+The betting odds data was imported using another [python script](scripts/betting_data_importer.py), the script gets the csv file from a url and saves it in the data directory.
 
 ## Process
 
