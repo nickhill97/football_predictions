@@ -81,9 +81,9 @@ In the next step, I trained machine learning models to predict the relative scor
 
 Lastly, I trained models to predict the result of the match. Prior to training classifiers I scaled my data using a standard scaler. I used a ordinal classifier class for machine learning, this was written by Muhammad Assagaf and can be found [here](https://towardsdatascience.com/simple-trick-to-train-an-ordinal-regression-with-any-classifier-6911183d2a3c). The reason I used this class was because my results are ordinal, i.e. a loss is worse than a draw, which is worse than a win. This was used as an extension to the machine learning models, such that the multiple classification problem was transformed to two binary classification problems: 
 
-- Binary target was 1 if result a loss and the classifier predicts V1 = 1 - Pr(Result better than loss).
+- Binary target was 1 if result was a win and the classifier predicts V1 = Pr(Result was better than a draw).
 - Binary target was 1 if result was a draw and the classifier predicts V2 = Pr(Result better than loss) - Pr(Result better than a draw).
-- Binary target was 1 if result was a win and the classifier predicts V3 = Pr(Result was better than a draw) = 1 - V1 - V2.
+- Binary target was 1 if result a loss and the classifier predicts V3 = 1 - Pr(Result better than loss) = 1 - V1 - V2.
 
 The best classifier was a logistic regression model with an accuracy of 0.54.
 
