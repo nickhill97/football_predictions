@@ -10,7 +10,7 @@ flake8==3.7.9
 html5lib==1.0.1
 idna==2.9
 ipykernel==5.2.1
-ipython==7.13.0
+ipython==7.16.3
 ipython-genutils==0.2.0
 jedi==0.17.0
 joblib==0.14.1
